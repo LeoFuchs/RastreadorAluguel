@@ -22,12 +22,20 @@ def extrair_codigo_fonte_com_rolagem(url: str) -> str:
         driver.get(url)
         time.sleep(5)
 
-        def is_button_visible() -> bool:
-            return len(driver.find_elements(By.XPATH, "//button[contains(text(), 'Ver mais')]")) > 0
+        def quantidade_de_apartamentos() -> int:
+            return len(driver.find_elements(By.CSS_SELECTOR, "div[data-testid='house-card-container-rent']"))
 
-        while is_button_visible():
-            driver.find_element(By.XPATH, "//button[contains(text(), 'Ver mais')]").click()
+        while True:
+            quantidade_anterior = quantidade_de_apartamentos()
+            botoes_ver_mais = driver.find_elements(By.XPATH, "//button[contains(text(), 'Ver mais')]")
+            if not botoes_ver_mais:
+                break
+
+            botoes_ver_mais[0].click()
             time.sleep(7)
+
+            if quantidade_de_apartamentos() <= quantidade_anterior:
+                break
 
         return driver.page_source
     finally:
