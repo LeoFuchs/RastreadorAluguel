@@ -5,7 +5,7 @@ import pandas as pd
 
 
 PLATAFORMAS = ["zapimoveis", "quintoandar"]
-BAIRROS = ["santa_cecilia", "perdizes", "barra_funda"]
+BAIRROS = ["vila_mariana"]
 
 
 def listar_pastas_por_data(base_dir: str) -> list[str]:

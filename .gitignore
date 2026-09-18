@@ -19,7 +19,3 @@ Thumbs.db
 
 # Logs
 *.log
-
-# Data outputs
-/data/raw/
-/data/processed/
