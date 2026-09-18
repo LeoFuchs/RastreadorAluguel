@@ -1,0 +1,7 @@
+# Dependências do projeto
+
+pandas
+selenium
+beautifulsoup4
+requests
+lxml
