@@ -1,5 +1,33 @@
 # Rastreador de Aluguel
 
+> Coleta diária de anúncios de aluguel e identificação de imóveis novos em São Paulo.
+
+O projeto usa Selenium para carregar páginas dinâmicas do Zap Imóveis e do Quinto Andar, extrai os links dos anúncios e compara coletas de datas diferentes.
+
+## Fluxo
+
+1. Um coletor acessa uma plataforma e salva um CSV por bairro e data em `data/raw/`.
+2. `compare_daily_urls.py` compara as duas datas mais recentes de cada plataforma e bairro.
+3. Os links que aparecem apenas na coleta mais recente são salvos em `data/processed/`.
+
+## Formato dos dados
+
+Os CSVs usam uma coluna `URL`. O coletor do Quinto Andar normaliza anúncios para URLs canônicas, preservando a categoria necessária para o acesso:
+
+```text
+https://www.quintoandar.com.br/imovel/893329128/
+https://www.quintoandar.com.br/classificado/129214854/
+```
+
+## Observações
+
+- O comparador ignora bairros sem pelo menos duas datas disponíveis.
+- Os scripts devem ser executados a partir da raiz do repositório, pois os caminhos de saída são relativos.
+- Os dados coletados podem conter anúncios fora do bairro nominal quando a plataforma amplia os resultados da busca.
+- O processo foi desenhado para uso recorrente, mas ainda não possui agendamento, testes automatizados ou persistência além dos CSVs.
+
+# Rastreador de Aluguel
+
 Este projeto coleta e compara anúncios de aluguel de diferentes bairros de São Paulo, buscando automatizar a identificação de imóveis novos em plataformas como Zap Imóveis e Quinto Andar.
 
 ## Objetivo
@@ -16,10 +44,6 @@ Com isso, o projeto ajuda a:
 ## Fluxo do projeto
 
 1. Coleta dos dados
-   - acessa as páginas de busca das plataformas;
-   - carrega os resultados de imóveis;
-   - extrai os links dos anúncios;
-   - salva os dados em arquivos CSV.
 
 2. Organização por bairro e data
    - cada execução gera registros por bairro e por data;

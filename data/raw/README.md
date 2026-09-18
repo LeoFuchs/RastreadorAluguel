@@ -1,21 +1,19 @@
-# Rastreador de Aluguel
+# Dados brutos
 
-Este diretório foi criado para armazenar os dados brutos coletados das plataformas.
+Este diretório armazena os dados coletados diretamente das plataformas.
 
 ## Estrutura esperada
 
 ```text
 data/raw/
 ├── zapimoveis/
-│   ├── santa_cecilia/
-│   │   └── 2024_05_01/
-│   │       └── zapimoveis_santa_cecilia_2024_05_01.csv
-│   ├── perdizes/
-│   └── barra_funda/
+│   └── vila_mariana/
+│       └── YYYY_MM_DD/
+│           └── zapimoveis_vila_mariana_YYYY_MM_DD.csv
 └── quintoandar/
-    ├── santa_cecilia/
-    ├── perdizes/
-    └── barra_funda/
+    └── vila_mariana/
+        └── YYYY_MM_DD/
+            └── quintoandar_vila_mariana_YYYY_MM_DD.csv
 ```
 
-Os arquivos são organizados por plataforma, bairro e data.
+Os arquivos são organizados por plataforma, bairro e data. Os nomes reais dos bairros vêm das configurações em `src/`.

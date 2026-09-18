@@ -1,5 +1,5 @@
 # Notebooks legados
 
-Os notebooks originais foram mantidos apenas como referência histórica.
+Os notebooks originais foram mantidos apenas como referência histórica e não fazem parte do fluxo recomendado de execução.
 
-A lógica foi convertida para scripts em Python dentro de `src/` para facilitar manutenção, modularização e execução em ambiente automatizado.
+A lógica de coleta e comparação foi convertida para scripts em `src/`, que devem ser executados a partir da raiz do repositório. Alterações de comportamento devem ser feitas nos scripts e documentadas no README principal.
