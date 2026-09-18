@@ -35,9 +35,6 @@ jobs:
       - name: Instalar dependências
         run: python -m pip install -r requirements.txt
 
-      - name: Executar coleta do Zap Imóveis
-        run: python src/generate_zap_data.py
-
       - name: Executar coleta do Quinto Andar
         run: python src/generate_quintoandar_data.py
 
