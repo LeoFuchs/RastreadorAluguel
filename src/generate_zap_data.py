@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 import time
 from datetime import datetime
@@ -7,21 +8,16 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from selenium import webdriver
 
+try:
+    from src.collection_utils import criar_metadados, deduplicar_urls, salvar_metadados
+    from src.config import ZAPIMOVEIS_BAIRROS
+except ModuleNotFoundError:
+    from collection_utils import criar_metadados, deduplicar_urls, salvar_metadados
+    from config import ZAPIMOVEIS_BAIRROS
 
-BairroInfo = {
-    "santa_cecilia": {
-        "zona": "sp+sao-paulo+centro+sta-cecilia",
-        "paginas": 2,
-    },
-    "perdizes": {
-        "zona": "sp+sao-paulo+zona-oeste+perdizes",
-        "paginas": 4,
-    },
-    "barra_funda": {
-        "zona": "sp+sao-paulo+zona-oeste+barra-funda",
-        "paginas": 2,
-    },
-}
+
+BairroInfo = ZAPIMOVEIS_BAIRROS
+logger = logging.getLogger(__name__)
 
 
 def extrair_codigo_fonte_com_rolagem(url: str) -> str:
@@ -63,10 +59,12 @@ def gerar_url_busca_bairro(bairro: str, pagina: int) -> str:
     )
 
 
-def salvar_csv(urls: list[str], bairro: str, data_dir: str) -> str:
+def salvar_csv(urls: list[str], bairro: str, data_dir: str, inicio: datetime, fim: datetime) -> str:
     os.makedirs(data_dir, exist_ok=True)
     arquivo = os.path.join(data_dir, f"zapimoveis_{bairro}_{datetime.now().strftime('%Y_%m_%d')}.csv")
     pd.DataFrame({"URL": urls}).to_csv(arquivo, index=False)
+    metadados = criar_metadados("zapimoveis", bairro, gerar_url_busca_bairro(bairro, 1), len(urls), inicio, fim)
+    salvar_metadados(arquivo, metadados)
     return arquivo
 
 
@@ -85,25 +83,27 @@ def coletar_urls_do_bairro(bairro: str, paginas: int = None) -> list[str]:
             for link in div.find_all("a", href=True):
                 urls.append(link["href"])
 
-    return urls
+    return deduplicar_urls(urls)
 
 
 def main():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description="Coleta URLs de aluguel do Zap Imóveis por bairro.")
-    parser.add_argument("--bairro", required=True, choices=sorted(BairroInfo.keys()))
+    parser.add_argument("--bairro", choices=sorted(BairroInfo.keys()))
     parser.add_argument("--paginas", type=int, default=None)
     args = parser.parse_args()
 
-    bairro = args.bairro
-    paginas = args.paginas
-    urls = coletar_urls_do_bairro(bairro, paginas)
-
-    hoje = datetime.now().strftime("%Y_%m_%d")
-    pasta_saida = os.path.join("data", "raw", "zapimoveis", bairro, hoje)
-    arquivo = salvar_csv(urls, bairro, pasta_saida)
-
-    print(f"Total de URLs coletadas para {bairro}: {len(urls)}")
-    print(f"Arquivo salvo em: {arquivo}")
+    bairros = [args.bairro] if args.bairro else BairroInfo
+    for bairro in bairros:
+        inicio = datetime.now()
+        try:
+            urls = coletar_urls_do_bairro(bairro, args.paginas)
+            hoje = datetime.now().strftime("%Y_%m_%d")
+            pasta_saida = os.path.join("data", "raw", "zapimoveis", bairro, hoje)
+            arquivo = salvar_csv(urls, bairro, pasta_saida, inicio, datetime.now())
+            logger.info("Zap Imóveis: %s URLs para %s; arquivo: %s", len(urls), bairro, arquivo)
+        except Exception:
+            logger.exception("Falha ao coletar Zap Imóveis para %s", bairro)
 
 
 if __name__ == "__main__":

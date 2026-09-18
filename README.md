@@ -18,9 +18,16 @@ RastreadorAluguel/
 ├── requirements.txt
 ├── .gitignore
 ├── src/
+│   ├── config.py
+│   ├── collection_utils.py
 │   ├── generate_zap_data.py
 │   ├── generate_quintoandar_data.py
 │   └── compare_daily_urls.py
+├── tests/
+│   └── test_project.py
+├── .github/
+│   └── workflows/
+│       └── daily-collection.yml
 ├── data/
 │   ├── raw/
 │   │   ├── README.md
@@ -38,9 +45,12 @@ RastreadorAluguel/
 
 ## Componentes principais
 
-- `generate_zap_data.py`: coleta anúncios do Zap Imóveis para um bairro por execução. Aceita `--paginas` para sobrescrever a configuração padrão.
+- `config.py`: configura URLs, bairros e paginação por plataforma.
+- `collection_utils.py`: deduplica URLs e grava metadados das coletas.
+- `generate_zap_data.py`: coleta anúncios do Zap Imóveis. Sem `--bairro`, processa todos os bairros configurados; aceita `--paginas` para sobrescrever a configuração padrão.
 - `generate_quintoandar_data.py`: coleta sequencialmente todos os bairros definidos em `BairroInfo`.
 - `compare_daily_urls.py`: compara as duas coletas mais recentes e gera os anúncios novos.
+- `tests/test_project.py`: testes unitários para URLs, deduplicação, metadados e comparação.
 
 ## Bairros configurados
 
@@ -50,7 +60,7 @@ Atualmente, os coletores e o comparador estão configurados para:
 - `vila_saude`
 - `bosque_saude`
 
-As configurações de busca ficam no início de cada coletor. Ao adicionar ou remover bairros, atualize também `BAIRROS` em `compare_daily_urls.py`.
+As configurações de busca ficam em `src/config.py`. Ao adicionar ou remover bairros, altere somente esse arquivo.
 
 ## Requisitos e instalação
 
@@ -76,6 +86,7 @@ Execute os comandos a partir da raiz do repositório.
 ```bash
 python src/generate_zap_data.py --bairro vila_mariana
 python src/generate_zap_data.py --bairro vila_mariana --paginas 2
+python src/generate_zap_data.py
 ```
 
 ### Coletar dados do Quinto Andar
@@ -92,6 +103,12 @@ Esse comando processa todos os bairros de `BairroInfo` em sequência e cria um C
 python src/compare_daily_urls.py
 ```
 
+### Executar a rotina diária no GitHub Actions
+
+O workflow `.github/workflows/daily-collection.yml` pode ser iniciado manualmente ou executado diariamente pelo agendamento configurado. Ele instala Python, Chrome e as dependências, executa os dois coletores, compara as coletas e commita os CSVs e metadados gerados no repositório.
+
+Para permitir o commit automático, o workflow usa `permissions: contents: write`. O horário do `cron` é UTC.
+
 ## Formato dos dados
 
 Os CSVs usam uma coluna `URL`. O coletor do Quinto Andar normaliza anúncios para URLs canônicas, preservando a categoria necessária para o acesso:
@@ -106,4 +123,6 @@ https://www.quintoandar.com.br/classificado/129214854/
 - O comparador ignora bairros sem pelo menos duas datas disponíveis.
 - Os dados coletados podem conter anúncios fora do bairro nominal quando a plataforma amplia os resultados da busca.
 - As páginas podem mudar de estrutura ou bloquear automações.
-- O processo ainda não possui agendamento, testes automatizados ou persistência além dos CSVs.
+- O agendamento e a persistência dos resultados são feitos pelo GitHub Actions; os runners são descartáveis, mas os CSVs e metadados são commitados no repositório.
+- Cada coleta também gera um arquivo `.metadata.json` com plataforma, bairro, URL de busca, quantidade de URLs, início, fim e duração.
+- Execute os testes com `python -m unittest discover -s tests -v`.

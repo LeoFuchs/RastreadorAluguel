@@ -1,11 +1,16 @@
 import os
+import logging
 from datetime import datetime
 
 import pandas as pd
 
+try:
+    from src.config import PLATAFORMAS
+except ModuleNotFoundError:
+    from config import PLATAFORMAS
 
-PLATAFORMAS = ["zapimoveis", "quintoandar"]
-BAIRROS = ["vila_mariana", "vila_saude", "bosque_saude"]
+
+logger = logging.getLogger(__name__)
 
 
 def listar_pastas_por_data(base_dir: str) -> list[str]:
@@ -31,12 +36,13 @@ def comparar_urls(arquivo_hoje: str, arquivo_ontem: str) -> list[str]:
 
 
 def main():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     base_root = os.path.join("data", "raw")
     output_root = os.path.join("data", "processed")
     os.makedirs(output_root, exist_ok=True)
 
-    for plataforma in PLATAFORMAS:
-        for bairro in BAIRROS:
+    for plataforma, bairros in PLATAFORMAS.items():
+        for bairro in bairros:
             caminho_plataforma = os.path.join(base_root, plataforma, bairro)
             if not os.path.exists(caminho_plataforma):
                 continue
@@ -53,10 +59,13 @@ def main():
             if not os.path.exists(arquivo_hoje) or not os.path.exists(arquivo_ontem):
                 continue
 
-            urls_novas = comparar_urls(arquivo_hoje, arquivo_ontem)
-            arquivo_saida = os.path.join(output_root, f"{plataforma}_{bairro}_novos.csv")
-            pd.DataFrame({"URL": urls_novas}).to_csv(arquivo_saida, index=False)
-            print(f"{plataforma} / {bairro}: {len(urls_novas)} novos")
+            try:
+                urls_novas = comparar_urls(arquivo_hoje, arquivo_ontem)
+                arquivo_saida = os.path.join(output_root, f"{plataforma}_{bairro}_novos.csv")
+                pd.DataFrame({"URL": urls_novas}).to_csv(arquivo_saida, index=False)
+                logger.info("%s / %s: %s novos; arquivo: %s", plataforma, bairro, len(urls_novas), arquivo_saida)
+            except Exception:
+                logger.exception("Falha ao comparar %s / %s", plataforma, bairro)
 
 
 if __name__ == "__main__":
