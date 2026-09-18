@@ -23,8 +23,6 @@ RastreadorAluguel/
 │   ├── generate_zap_data.py
 │   ├── generate_quintoandar_data.py
 │   └── compare_daily_urls.py
-├── tests/
-│   └── test_project.py
 ├── .github/
 │   └── workflows/
 │       └── daily-collection.yml
@@ -36,9 +34,6 @@ RastreadorAluguel/
 │   ├── processed/
 │   │   └── README.md
 │   └── README.md
-├── notebooks/
-│   └── legacy/
-│       └── README.md
 └── docs/
     └── README.md
 ```
@@ -50,7 +45,6 @@ RastreadorAluguel/
 - `generate_zap_data.py`: coleta anúncios do Zap Imóveis. Sem `--bairro`, processa todos os bairros configurados; aceita `--paginas` para sobrescrever a configuração padrão.
 - `generate_quintoandar_data.py`: coleta sequencialmente todos os bairros definidos em `BairroInfo`.
 - `compare_daily_urls.py`: compara as duas coletas mais recentes e gera os anúncios novos.
-- `tests/test_project.py`: testes unitários para URLs, deduplicação, metadados e comparação.
 
 ## Bairros configurados
 
@@ -123,6 +117,4 @@ https://www.quintoandar.com.br/classificado/129214854/
 - O comparador ignora bairros sem pelo menos duas datas disponíveis.
 - Os dados coletados podem conter anúncios fora do bairro nominal quando a plataforma amplia os resultados da busca.
 - As páginas podem mudar de estrutura ou bloquear automações.
-- O agendamento e a persistência dos resultados são feitos pelo GitHub Actions; os runners são descartáveis, mas os CSVs e metadados são commitados no repositório.
 - Cada coleta também gera um arquivo `.metadata.json` com plataforma, bairro, URL de busca, quantidade de URLs, início, fim e duração.
-- Execute os testes com `python -m unittest discover -s tests -v`.
