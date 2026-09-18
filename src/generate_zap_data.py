@@ -7,6 +7,7 @@ from datetime import datetime
 import pandas as pd
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 
 try:
     from src.collection_utils import criar_metadados, deduplicar_urls, salvar_metadados
@@ -21,7 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 def extrair_codigo_fonte_com_rolagem(url: str) -> str:
-    driver = webdriver.Chrome()
+    opcoes = Options()
+    opcoes.add_argument("--headless=new")
+    opcoes.add_argument("--no-sandbox")
+    opcoes.add_argument("--disable-dev-shm-usage")
+    opcoes.add_argument("--disable-gpu")
+    opcoes.add_argument("--window-size=1920,1080")
+    driver = webdriver.Chrome(options=opcoes)
     try:
         driver.get(url)
         time.sleep(5)
