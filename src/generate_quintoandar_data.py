@@ -11,10 +11,9 @@ from selenium.webdriver.common.by import By
 
 
 BairroInfo = {
-    "santa_cecilia": "https://www.quintoandar.com.br/alugar/imovel/santa-cecilia-sao-paulo-sp-brasil/de-3000-a-6000-reais/apartamento/kitnet/de-45-a-110-m2",
-    "perdizes": "https://www.quintoandar.com.br/alugar/imovel/perdizes-sao-paulo-sp-brasil/de-3000-a-6000-reais/apartamento/kitnet/de-45-a-110-m2",
-    "barra_funda": "https://www.quintoandar.com.br/alugar/imovel/barra-funda-sao-paulo-sp-brasil/de-3000-a-6000-reais/apartamento/kitnet/de-45-a-110-m2",
-    "vila_mariana": "https://www.quintoandar.com.br/alugar/imovel/vila-mariana-sao-paulo-sp-brasil/de-5000-a-8000-reais/apartamento/2-quartos/de-70-a-100-m2"
+    "vila_mariana": "https://www.quintoandar.com.br/alugar/imovel/vila-mariana-sao-paulo-sp-brasil/de-5000-a-8000-reais/apartamento/2-quartos/de-70-a-100-m2",
+    "vila_saude": "https://www.quintoandar.com.br/alugar/imovel/vila-da-saude-sao-paulo-sp-brasil/de-5000-a-8000-reais/apartamento/2-quartos/de-70-a-100-m2",
+    "bosque_saude": "https://www.quintoandar.com.br/alugar/imovel/bosque-da-saude-sao-paulo-sp-brasil/de-5000-a-8000-reais/apartamento/2-quartos/de-70-a-100-m2",
 }
 
 
@@ -34,7 +33,7 @@ def extrair_codigo_fonte_com_rolagem(url: str) -> str:
                 break
 
             botoes_ver_mais[0].click()
-            time.sleep(7)
+            time.sleep(5)
 
             if quantidade_de_apartamentos() <= quantidade_anterior:
                 break
@@ -81,16 +80,16 @@ def salvar_csv(urls: list[str], bairro: str) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Coleta URLs de aluguel do Quinto Andar por bairro.")
-    parser.add_argument("--bairro", required=True, choices=sorted(BairroInfo.keys()))
-    args = parser.parse_args()
+    argparse.ArgumentParser(
+        description="Coleta URLs de aluguel do Quinto Andar para todos os bairros configurados."
+    ).parse_args()
 
-    bairro = args.bairro
-    urls = coletar_urls_do_bairro(bairro)
-    arquivo = salvar_csv(urls, bairro)
+    for bairro in BairroInfo:
+        urls = coletar_urls_do_bairro(bairro)
+        arquivo = salvar_csv(urls, bairro)
 
-    print(f"Total de URLs coletadas para {bairro}: {len(urls)}")
-    print(f"Arquivo salvo em: {arquivo}")
+        print(f"Total de URLs coletadas para {bairro}: {len(urls)}")
+        print(f"Arquivo salvo em: {arquivo}")
 
 
 if __name__ == "__main__":
