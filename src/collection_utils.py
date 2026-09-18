@@ -4,8 +4,16 @@ from datetime import datetime
 from typing import Any
 
 
-def deduplicar_urls(urls: list[str]) -> list[str]:
-    return list(dict.fromkeys(url for url in urls if url))
+def deduplicar_urls(urls: list[str], urls_ja_vistas: set[str] | None = None) -> list[str]:
+    urls_unicas = []
+    urls_vistas = set() if urls_ja_vistas is None else urls_ja_vistas
+
+    for url in urls:
+        if url and url not in urls_vistas:
+            urls_unicas.append(url)
+            urls_vistas.add(url)
+
+    return urls_unicas
 
 
 def salvar_metadados(arquivo_csv: str, metadados: dict[str, Any]) -> str:

@@ -65,7 +65,9 @@ def normalizar_url_imovel(href: str) -> str | None:
     return f"https://www.quintoandar.com.br/{categoria}/{identificador}/"
 
 
-def coletar_urls_do_bairro(bairro: str) -> list[str]:
+def coletar_urls_do_bairro(
+    bairro: str, urls_ja_vistas: set[str] | None = None
+) -> list[str]:
     url_busca = BairroInfo[bairro]
     codigo_fonte = extrair_codigo_fonte_com_rolagem(url_busca)
     soup = BeautifulSoup(codigo_fonte, "lxml")
@@ -78,7 +80,7 @@ def coletar_urls_do_bairro(bairro: str) -> list[str]:
             if url_imovel is not None:
                 urls.append(url_imovel)
 
-    return deduplicar_urls(urls)
+    return deduplicar_urls(urls, urls_ja_vistas)
 
 
 def salvar_csv(urls: list[str], bairro: str, inicio: datetime, fim: datetime) -> str:
@@ -99,10 +101,11 @@ def main():
         description="Coleta URLs de aluguel do Quinto Andar para todos os bairros configurados."
     ).parse_args()
 
+    urls_ja_vistas = set()
     for bairro in BairroInfo:
         inicio = datetime.now()
         try:
-            urls = coletar_urls_do_bairro(bairro)
+            urls = coletar_urls_do_bairro(bairro, urls_ja_vistas)
             fim = datetime.now()
             arquivo = salvar_csv(urls, bairro, inicio, fim)
         except Exception:

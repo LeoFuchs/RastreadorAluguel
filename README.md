@@ -118,3 +118,4 @@ https://www.quintoandar.com.br/classificado/129214854/
 - Os dados coletados podem conter anúncios fora do bairro nominal quando a plataforma amplia os resultados da busca.
 - As páginas podem mudar de estrutura ou bloquear automações.
 - Cada coleta também gera um arquivo `.metadata.json` com plataforma, bairro, URL de busca, quantidade de URLs, início, fim e duração.
+- Dentro de cada plataforma, um anúncio encontrado em mais de um bairro é salvo somente no primeiro bairro da ordem configurada para a execução do dia.

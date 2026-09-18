@@ -75,7 +75,9 @@ def salvar_csv(urls: list[str], bairro: str, data_dir: str, inicio: datetime, fi
     return arquivo
 
 
-def coletar_urls_do_bairro(bairro: str, paginas: int = None) -> list[str]:
+def coletar_urls_do_bairro(
+    bairro: str, paginas: int = None, urls_ja_vistas: set[str] | None = None
+) -> list[str]:
     if paginas is None:
         paginas = BairroInfo[bairro]["paginas"]
 
@@ -90,7 +92,7 @@ def coletar_urls_do_bairro(bairro: str, paginas: int = None) -> list[str]:
             for link in div.find_all("a", href=True):
                 urls.append(link["href"])
 
-    return deduplicar_urls(urls)
+    return deduplicar_urls(urls, urls_ja_vistas)
 
 
 def main():
@@ -101,10 +103,11 @@ def main():
     args = parser.parse_args()
 
     bairros = [args.bairro] if args.bairro else BairroInfo
+    urls_ja_vistas = set()
     for bairro in bairros:
         inicio = datetime.now()
         try:
-            urls = coletar_urls_do_bairro(bairro, args.paginas)
+            urls = coletar_urls_do_bairro(bairro, args.paginas, urls_ja_vistas)
             hoje = datetime.now().strftime("%Y_%m_%d")
             pasta_saida = os.path.join("data", "raw", "zapimoveis", bairro, hoje)
             arquivo = salvar_csv(urls, bairro, pasta_saida, inicio, datetime.now())
