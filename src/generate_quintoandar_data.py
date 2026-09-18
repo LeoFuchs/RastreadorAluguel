@@ -1,5 +1,6 @@
 import argparse
 import os
+import re
 import time
 from datetime import datetime
 
@@ -13,6 +14,7 @@ BairroInfo = {
     "santa_cecilia": "https://www.quintoandar.com.br/alugar/imovel/santa-cecilia-sao-paulo-sp-brasil/de-3000-a-6000-reais/apartamento/kitnet/de-45-a-110-m2",
     "perdizes": "https://www.quintoandar.com.br/alugar/imovel/perdizes-sao-paulo-sp-brasil/de-3000-a-6000-reais/apartamento/kitnet/de-45-a-110-m2",
     "barra_funda": "https://www.quintoandar.com.br/alugar/imovel/barra-funda-sao-paulo-sp-brasil/de-3000-a-6000-reais/apartamento/kitnet/de-45-a-110-m2",
+    "vila_mariana": "https://www.quintoandar.com.br/alugar/imovel/vila-mariana-sao-paulo-sp-brasil/de-5000-a-8000-reais/apartamento/2-quartos/de-70-a-100-m2"
 }
 
 
@@ -42,6 +44,16 @@ def extrair_codigo_fonte_com_rolagem(url: str) -> str:
         driver.quit()
 
 
+def normalizar_url_imovel(href: str) -> str | None:
+    correspondencia = re.search(r"/(imovel|classificado)/(\d+)(?:/|$)", href)
+    if correspondencia is None:
+        return None
+
+    categoria = correspondencia.group(1)
+    identificador = correspondencia.group(2)
+    return f"https://www.quintoandar.com.br/{categoria}/{identificador}/"
+
+
 def coletar_urls_do_bairro(bairro: str) -> list[str]:
     url_busca = BairroInfo[bairro]
     codigo_fonte = extrair_codigo_fonte_com_rolagem(url_busca)
@@ -51,7 +63,9 @@ def coletar_urls_do_bairro(bairro: str) -> list[str]:
     cards = soup.find_all("div", {"data-testid": "house-card-container-rent"})
     for card in cards:
         for link in card.find_all("a", href=True):
-            urls.append(link["href"])
+            url_imovel = normalizar_url_imovel(link["href"])
+            if url_imovel is not None:
+                urls.append(url_imovel)
 
     return urls
 
