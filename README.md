@@ -7,7 +7,7 @@ O projeto usa Selenium para carregar páginas dinâmicas do Zap Imóveis e do Qu
 ## Fluxo
 
 1. Um coletor acessa uma plataforma e salva um CSV por bairro e data em `data/raw/`.
-2. `compare_daily_urls.py` compara as duas datas mais recentes de cada plataforma e bairro.
+2. `compare_daily_urls.py` compara os links da coleta mais recente com os encontrados nos sete dias anteriores de cada plataforma e bairro.
 3. Os links que aparecem apenas na coleta mais recente são salvos em `data/processed/`.
 
 ## Estrutura do repositório
@@ -44,7 +44,7 @@ RastreadorAluguel/
 - `collection_utils.py`: deduplica URLs e grava metadados das coletas.
 - `generate_zap_data.py`: coleta anúncios do Zap Imóveis. Sem `--bairro`, processa todos os bairros configurados; aceita `--paginas` para sobrescrever a configuração padrão.
 - `generate_quintoandar_data.py`: coleta sequencialmente todos os bairros definidos em `BairroInfo`.
-- `compare_daily_urls.py`: compara as duas coletas mais recentes e gera os anúncios novos.
+- `compare_daily_urls.py`: compara a coleta mais recente com as coletas dos sete dias anteriores e gera os anúncios ainda não vistos nesse período.
 
 ## Bairros configurados
 

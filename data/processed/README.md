@@ -9,4 +9,4 @@ zapimoveis_vila_mariana_novos.csv
 quintoandar_vila_mariana_novos.csv
 ```
 
-Cada arquivo contém uma coluna `URL` com os anúncios presentes na coleta mais recente e ausentes na coleta anterior. Arquivos só são gerados quando existem pelo menos duas datas válidas em `data/raw/`.
+Cada arquivo contém uma coluna `URL` com os anúncios presentes na coleta mais recente e que não apareceram em nenhuma coleta dos sete dias anteriores. São usadas as coletas disponíveis nesse intervalo. Arquivos só são gerados quando há uma coleta mais recente e pelo menos uma coleta anterior disponível nos sete dias.

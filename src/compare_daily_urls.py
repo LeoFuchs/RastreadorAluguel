@@ -1,6 +1,6 @@
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 
@@ -22,17 +22,21 @@ def listar_pastas_por_data(base_dir: str) -> list[str]:
     )
 
 
-def comparar_urls(arquivo_hoje: str, arquivo_ontem: str) -> list[str]:
+def comparar_urls(arquivo_hoje: str, arquivos_anteriores: list[str]) -> list[str]:
     hoje_df = pd.read_csv(arquivo_hoje)
-    ontem_df = pd.read_csv(arquivo_ontem)
 
-    if "URL" not in hoje_df.columns or "URL" not in ontem_df.columns:
-        raise ValueError(f"Arquivos com colunas inválidas: {arquivo_hoje} | {arquivo_ontem}")
+    if "URL" not in hoje_df.columns:
+        raise ValueError(f"Arquivo com coluna inválida: {arquivo_hoje}")
 
     urls_hoje = set(hoje_df["URL"].dropna().astype(str))
-    urls_ontem = set(ontem_df["URL"].dropna().astype(str))
-    novas = sorted(urls_hoje - urls_ontem)
-    return novas
+    urls_anteriores = set()
+    for arquivo_anterior in arquivos_anteriores:
+        anterior_df = pd.read_csv(arquivo_anterior)
+        if "URL" not in anterior_df.columns:
+            raise ValueError(f"Arquivo com coluna inválida: {arquivo_anterior}")
+        urls_anteriores.update(anterior_df["URL"].dropna().astype(str))
+
+    return sorted(urls_hoje - urls_anteriores)
 
 
 def main():
@@ -52,18 +56,39 @@ def main():
                 continue
 
             hoje = datas[-1]
-            ontem = datas[-2]
-            arquivo_hoje = os.path.join(caminho_plataforma, hoje, f"{plataforma}_{bairro}_{hoje}.csv")
-            arquivo_ontem = os.path.join(caminho_plataforma, ontem, f"{plataforma}_{bairro}_{ontem}.csv")
+            data_hoje = datetime.strptime(hoje, "%Y_%m_%d").date()
+            primeiro_dia = data_hoje - timedelta(days=7)
+            datas_anteriores = []
+            for data in datas[:-1]:
+                try:
+                    data_anterior = datetime.strptime(data, "%Y_%m_%d").date()
+                except ValueError:
+                    continue
+                if primeiro_dia <= data_anterior < data_hoje:
+                    datas_anteriores.append(data)
 
-            if not os.path.exists(arquivo_hoje) or not os.path.exists(arquivo_ontem):
+            arquivo_hoje = os.path.join(caminho_plataforma, hoje, f"{plataforma}_{bairro}_{hoje}.csv")
+            arquivos_anteriores = [
+                os.path.join(caminho_plataforma, data, f"{plataforma}_{bairro}_{data}.csv")
+                for data in datas_anteriores
+            ]
+            arquivos_anteriores = [arquivo for arquivo in arquivos_anteriores if os.path.exists(arquivo)]
+
+            if not os.path.exists(arquivo_hoje) or not arquivos_anteriores:
                 continue
 
             try:
-                urls_novas = comparar_urls(arquivo_hoje, arquivo_ontem)
+                urls_novas = comparar_urls(arquivo_hoje, arquivos_anteriores)
                 arquivo_saida = os.path.join(output_root, f"{plataforma}_{bairro}_novos.csv")
                 pd.DataFrame({"URL": urls_novas}).to_csv(arquivo_saida, index=False)
-                logger.info("%s / %s: %s novos; arquivo: %s", plataforma, bairro, len(urls_novas), arquivo_saida)
+                logger.info(
+                    "%s / %s: %s novos comparados com %s coletas anteriores; arquivo: %s",
+                    plataforma,
+                    bairro,
+                    len(urls_novas),
+                    len(arquivos_anteriores),
+                    arquivo_saida,
+                )
             except Exception:
                 logger.exception("Falha ao comparar %s / %s", plataforma, bairro)
 
