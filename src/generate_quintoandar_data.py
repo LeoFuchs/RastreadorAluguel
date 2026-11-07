@@ -8,8 +8,11 @@ from datetime import datetime
 import pandas as pd
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from selenium.common.exceptions import ElementClickInterceptedException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 try:
     from src.collection_utils import criar_metadados, deduplicar_urls, salvar_metadados
@@ -34,20 +37,29 @@ def extrair_codigo_fonte_com_rolagem(url: str) -> str:
     try:
         driver.get(url)
         time.sleep(5)
+        wait = WebDriverWait(driver, 10)
+        botao_ver_mais = (By.CSS_SELECTOR, "button[data-testid='load-more-button']")
 
         def quantidade_de_apartamentos() -> int:
             return len(driver.find_elements(By.CSS_SELECTOR, "div[data-testid='house-card-container-rent']"))
 
         while True:
             quantidade_anterior = quantidade_de_apartamentos()
-            botoes_ver_mais = driver.find_elements(By.XPATH, "//button[contains(text(), 'Ver mais')]")
+            botoes_ver_mais = driver.find_elements(*botao_ver_mais)
             if not botoes_ver_mais:
                 break
 
-            botoes_ver_mais[0].click()
-            time.sleep(5)
+            botao = botoes_ver_mais[0]
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", botao)
+            botao = wait.until(EC.element_to_be_clickable(botao_ver_mais))
+            try:
+                botao.click()
+            except ElementClickInterceptedException:
+                driver.execute_script("arguments[0].click();", botao)
 
-            if quantidade_de_apartamentos() <= quantidade_anterior:
+            try:
+                wait.until(lambda _: quantidade_de_apartamentos() > quantidade_anterior)
+            except TimeoutException:
                 break
 
         return driver.page_source
@@ -102,6 +114,7 @@ def main():
     ).parse_args()
 
     urls_ja_vistas = set()
+    bairros_com_falha = []
     for bairro in BairroInfo:
         inicio = datetime.now()
         try:
@@ -110,9 +123,15 @@ def main():
             arquivo = salvar_csv(urls, bairro, inicio, fim)
         except Exception:
             logger.exception("Falha ao coletar Quinto Andar para %s", bairro)
+            bairros_com_falha.append(bairro)
             continue
 
         logger.info("Quinto Andar: %s URLs para %s; arquivo: %s", len(urls), bairro, arquivo)
+
+    if bairros_com_falha:
+        raise RuntimeError(
+            "Falha na coleta dos bairros: " + ", ".join(bairros_com_falha)
+        )
 
 
 if __name__ == "__main__":

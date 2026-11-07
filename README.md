@@ -11,7 +11,7 @@ O workflow `.github/workflows/daily-collection.yml` pode ser iniciado manualment
 1. `generate_quintoandar_data.py` coleta URLs para cada bairro configurado e salva CSVs e metadados em `data/raw/quintoandar/`.
 2. `compare_daily_urls.py` compara a coleta mais recente com as coletas disponíveis dos sete dias anteriores e salva anúncios novos em `data/processed/`.
 3. `curadoria_imoveis.py` lê esses anúncios, extrai detalhes das páginas e solicita ao Gemini uma classificação em JSON.
-4. As classificações são acrescentadas à aba configurada do Google Sheets e ao CSV diário em `data/curated/`.
+4. As classificações são acrescentadas à aba configurada do Google Sheets e ao CSV diário em `data/curated/`. Se o CSV já contiver uma classificação ainda não enviada, ela é reutilizada em vez de consumir outra chamada Gemini.
 5. `urls_processadas.json` registra URLs concluídas e `urls_pendentes.json` mantém as que ainda precisam ser processadas. A fila permite continuar em execuções futuras respeitando o limite diário.
 6. O workflow commita os dados coletados e o estado da curadoria no repositório. Se alguma URL falhar, salva a fila e então sinaliza falha na execução.
 
@@ -71,7 +71,9 @@ Variáveis opcionais do repositório:
 - `GOOGLE_SHEETS_WORKSHEET`: nome da aba; padrão `Curadoria Imóveis`. Se não existir, o script tenta criá-la.
 - `CURATORIA_MAX_URLS`: máximo de URLs selecionadas da fila por execução; padrão `25`.
 
-O workflow usa `permissions: contents: write` para persistir CSVs, URLs processadas e a fila pendente no repositório.
+O curador espaça chamadas Gemini em pelo menos 13 segundos, respeita o tempo de retry informado pela API e tenta novamente erros temporários. Se o limite continuar excedido, mantém as URLs restantes na fila para uma execução futura. Os resultados estruturados do modelo são registrados no log do workflow.
+
+Se a aba já tiver cabeçalhos, eles são mantidos; colunas de curadoria ausentes são acrescentadas ao final. O workflow usa `permissions: contents: write` para persistir CSVs, URLs processadas e a fila pendente no repositório, e tem timeout de 45 minutos para acomodar a coleta e os retries.
 
 ## Execução manual
 
