@@ -15,7 +15,14 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
+      GOOGLE_SHEETS_CREDENTIALS_JSON: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS_JSON }}
+      GOOGLE_SHEETS_SPREADSHEET_ID: ${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}
+      GOOGLE_SHEETS_WORKSHEET: ${{ vars.GOOGLE_SHEETS_WORKSHEET || 'Curadoria Imóveis' }}
+      CURATORIA_MAX_URLS: ${{ vars.CURATORIA_MAX_URLS || '25' }}
 
     steps:
       - name: Checkout do repositório
@@ -41,17 +48,20 @@ jobs:
       - name: Comparar coletas
         run: python src/compare_daily_urls.py
 
+      - name: Curadoria automática com Gemini e Google Sheets
+        run: python src/curadoria_imoveis.py
+
       - name: Commitar resultados
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/raw data/processed
+          git add data/raw data/processed data/curated
 
           if git diff --cached --quiet; then
             echo "Nenhum CSV novo ou alterado para commitar."
             exit 0
           fi
 
-          git commit -m "chore: atualizar dados de aluguel"
+          git commit -m "chore: atualizar dados e curadoria de aluguel"
           git push origin HEAD:${GITHUB_REF_NAME}
