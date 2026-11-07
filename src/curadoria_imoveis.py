@@ -22,6 +22,7 @@ except ModuleNotFoundError:
 logger = logging.getLogger(__name__)
 PASTA_CURADORIA = Path("data/curated")
 ARQUIVO_ESTADO = PASTA_CURADORIA / "urls_processadas.json"
+ARQUIVO_FILA = PASTA_CURADORIA / "urls_pendentes.json"
 CAMPOS = [
     "data_curadoria",
     "plataforma",
@@ -49,10 +50,9 @@ def carregar_urls_novas() -> list[dict[str, str]]:
                 df = pd.read_csv(caminho)
             except Exception:
                 logger.exception("Não foi possível ler %s", caminho)
-                continue
+                raise
             if "URL" not in df.columns:
-                logger.warning("CSV sem coluna URL: %s", caminho)
-                continue
+                raise ValueError(f"CSV sem coluna URL: {caminho}")
             for url in df["URL"].dropna().astype(str):
                 url = url.strip()
                 if url:
@@ -67,12 +67,49 @@ def carregar_urls_novas() -> list[dict[str, str]]:
 def carregar_urls_processadas() -> set[str]:
     if not ARQUIVO_ESTADO.exists():
         return set()
-    try:
-        dados = json.loads(ARQUIVO_ESTADO.read_text(encoding="utf-8"))
-        return set(dados if isinstance(dados, list) else [])
-    except (OSError, json.JSONDecodeError):
-        logger.exception("Não foi possível ler o estado da curadoria; iniciando sem cache.")
-        return set()
+    dados = json.loads(ARQUIVO_ESTADO.read_text(encoding="utf-8"))
+    if not isinstance(dados, list) or not all(isinstance(url, str) for url in dados):
+        raise ValueError(f"Formato inválido no estado da curadoria: {ARQUIVO_ESTADO}")
+    return set(dados)
+
+
+def carregar_fila_pendente() -> list[dict[str, str]]:
+    if not ARQUIVO_FILA.exists():
+        return []
+    dados = json.loads(ARQUIVO_FILA.read_text(encoding="utf-8"))
+    campos_obrigatorios = {"plataforma", "bairro", "url"}
+    if not isinstance(dados, list) or any(
+        not isinstance(item, dict)
+        or not campos_obrigatorios.issubset(item)
+        or any(not isinstance(item[campo], str) for campo in campos_obrigatorios)
+        for item in dados
+    ):
+        raise ValueError(f"Formato inválido na fila da curadoria: {ARQUIVO_FILA}")
+    return dados
+
+
+def salvar_json_atomico(caminho: Path, dados: Any) -> None:
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    temporario = caminho.with_name(f"{caminho.name}.tmp")
+    temporario.write_text(
+        json.dumps(dados, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    temporario.replace(caminho)
+
+
+def salvar_curadoria_csv(arquivo_csv: Path, linhas: list[dict[str, Any]]) -> None:
+    novas_linhas = pd.DataFrame(linhas, columns=CAMPOS)
+    if arquivo_csv.exists():
+        existentes = pd.read_csv(arquivo_csv)
+        if "url" not in existentes.columns:
+            raise ValueError(f"CSV de curadoria sem coluna url: {arquivo_csv}")
+        novas_linhas = pd.concat([existentes, novas_linhas], ignore_index=True)
+
+    novas_linhas = novas_linhas.drop_duplicates(subset=["url"], keep="last")
+    temporario = arquivo_csv.with_name(f"{arquivo_csv.name}.tmp")
+    novas_linhas.to_csv(temporario, index=False)
+    temporario.replace(arquivo_csv)
 
 
 def extrair_detalhes(url: str) -> dict[str, str]:
@@ -214,21 +251,29 @@ def enviar_para_planilha(linhas: list[dict[str, Any]]) -> None:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     ja_processadas = carregar_urls_processadas()
-    pendentes = [
-        item for item in carregar_urls_novas()
+    pendentes_por_url = {
+        item["url"]: item
+        for item in carregar_fila_pendente()
         if item["url"] not in ja_processadas
-    ]
-    limite = max(1, int(os.getenv("CURATORIA_MAX_URLS", "25")))
-    linhas = []
+    }
+    for item in carregar_urls_novas():
+        if item["url"] not in ja_processadas:
+            pendentes_por_url.setdefault(item["url"], item)
+    pendentes = list(pendentes_por_url.values())
+    salvar_json_atomico(ARQUIVO_FILA, pendentes)
 
-    for item in pendentes:
-        if len(linhas) >= limite:
-            break
+    limite = max(1, int(os.getenv("CURATORIA_MAX_URLS", "25")))
+    tentativas = pendentes[:limite]
+    linhas = []
+    falhas = []
+
+    for item in tentativas:
         try:
             detalhes = extrair_detalhes(item["url"])
             resultado = consultar_gemini(item["url"], item["bairro"], detalhes)
         except Exception:
             logger.exception("Falha ao curar %s; a URL poderá ser tentada novamente.", item["url"])
+            falhas.append(item["url"])
             continue
 
         linhas.append({
@@ -238,26 +283,29 @@ def main() -> None:
         })
 
     if not linhas:
+        if falhas:
+            raise RuntimeError(f"Falha ao curar {len(falhas)} URL(s); permanecem na fila.")
         logger.info("Nenhuma URL pendente de curadoria.")
         return
 
     PASTA_CURADORIA.mkdir(parents=True, exist_ok=True)
     data = datetime.now().strftime("%Y_%m_%d")
     arquivo_csv = PASTA_CURADORIA / f"curadoria_imoveis_{data}.csv"
-    df = pd.DataFrame(linhas, columns=CAMPOS)
-    if arquivo_csv.exists():
-        df.to_csv(arquivo_csv, mode="a", header=False, index=False)
-    else:
-        df.to_csv(arquivo_csv, index=False)
+    salvar_curadoria_csv(arquivo_csv, linhas)
 
     # Só registrar URLs como concluídas depois do envio à planilha.
     enviar_para_planilha(linhas)
-    ja_processadas.update(item["url"] for item in linhas)
-    ARQUIVO_ESTADO.write_text(
-        json.dumps(sorted(ja_processadas), ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    urls_concluidas = {item["url"] for item in linhas}
+    ja_processadas.update(urls_concluidas)
+    salvar_json_atomico(ARQUIVO_ESTADO, sorted(ja_processadas))
+    fila_atualizada = [
+        item for item in pendentes
+        if item["url"] not in urls_concluidas and item["url"] not in ja_processadas
+    ]
+    salvar_json_atomico(ARQUIVO_FILA, fila_atualizada)
     logger.info("%s imóveis enviados para a curadoria e registrados em %s.", len(linhas), arquivo_csv)
+    if falhas:
+        raise RuntimeError(f"Falha ao curar {len(falhas)} URL(s); permanecem na fila.")
 
 
 if __name__ == "__main__":

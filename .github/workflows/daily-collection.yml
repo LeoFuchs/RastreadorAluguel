@@ -45,10 +45,15 @@ jobs:
       - name: Executar coleta do Quinto Andar
         run: python src/generate_quintoandar_data.py
 
+      - name: Executar coleta do Zap Imóveis
+        run: python src/generate_zap_data.py
+
       - name: Comparar coletas
         run: python src/compare_daily_urls.py
 
       - name: Curadoria automática com Gemini e Google Sheets
+        id: curadoria
+        continue-on-error: true
         run: python src/curadoria_imoveis.py
 
       - name: Commitar resultados
@@ -65,3 +70,7 @@ jobs:
 
           git commit -m "chore: atualizar dados e curadoria de aluguel"
           git push origin HEAD:${GITHUB_REF_NAME}
+
+      - name: Sinalizar falha na curadoria
+        if: steps.curadoria.outcome == 'failure'
+        run: exit 1
