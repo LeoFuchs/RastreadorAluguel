@@ -263,7 +263,9 @@ def main() -> None:
     salvar_json_atomico(ARQUIVO_FILA, pendentes)
 
     limite = max(1, int(os.getenv("CURATORIA_MAX_URLS", "25")))
-    tentativas = pendentes[:limite]
+    plataformas_ativas = set(PLATAFORMAS)
+    elegiveis = [item for item in pendentes if item["plataforma"] in plataformas_ativas]
+    tentativas = elegiveis[:limite]
     linhas = []
     falhas = []
 

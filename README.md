@@ -1,60 +1,46 @@
 # Rastreador de Aluguel
 
-> Coleta diária de anúncios de aluguel e identificação de imóveis novos em São Paulo.
+> Coleta diária de anúncios do Quinto Andar e curadoria automática de imóveis para aluguel em São Paulo.
 
-O projeto usa Selenium para carregar páginas dinâmicas do Zap Imóveis e do Quinto Andar, extrai os links dos anúncios e compara coletas de datas diferentes.
+O projeto usa Selenium para coletar URLs do Quinto Andar, identifica anúncios novos e usa o Gemini para classificá-los. Os resultados são registrados em CSV e enviados para uma aba do Google Sheets. Por enquanto, o fluxo diário consulta somente o Quinto Andar.
 
-## Fluxo
+## Fluxo diário
 
-1. Um coletor acessa uma plataforma e salva um CSV por bairro e data em `data/raw/`.
-2. `compare_daily_urls.py` compara os links da coleta mais recente com os encontrados nos sete dias anteriores de cada plataforma e bairro.
-3. Os links que aparecem apenas na coleta mais recente são salvos em `data/processed/`.
+O workflow `.github/workflows/daily-collection.yml` pode ser iniciado manualmente ou roda diariamente às 10:00 UTC.
+
+1. `generate_quintoandar_data.py` coleta URLs para cada bairro configurado e salva CSVs e metadados em `data/raw/quintoandar/`.
+2. `compare_daily_urls.py` compara a coleta mais recente com as coletas disponíveis dos sete dias anteriores e salva anúncios novos em `data/processed/`.
+3. `curadoria_imoveis.py` lê esses anúncios, extrai detalhes das páginas e solicita ao Gemini uma classificação em JSON.
+4. As classificações são acrescentadas à aba configurada do Google Sheets e ao CSV diário em `data/curated/`.
+5. `urls_processadas.json` registra URLs concluídas e `urls_pendentes.json` mantém as que ainda precisam ser processadas. A fila permite continuar em execuções futuras respeitando o limite diário.
+6. O workflow commita os dados coletados e o estado da curadoria no repositório. Se alguma URL falhar, salva a fila e então sinaliza falha na execução.
 
 ## Estrutura do repositório
 
 ```text
 RastreadorAluguel/
-├── README.md
-├── requirements.txt
-├── .gitignore
 ├── src/
 │   ├── config.py
 │   ├── collection_utils.py
-│   ├── generate_zap_data.py
 │   ├── generate_quintoandar_data.py
-│   └── compare_daily_urls.py
-├── .github/
-│   └── workflows/
-│       └── daily-collection.yml
-├── data/
-│   ├── raw/
-│   │   ├── README.md
-│   │   ├── zapimoveis/
-│   │   └── quintoandar/
-│   ├── processed/
-│   │   └── README.md
-│   └── README.md
-└── docs/
-    └── README.md
+│   ├── compare_daily_urls.py
+│   └── curadoria_imoveis.py
+├── .github/workflows/daily-collection.yml
+└── data/
+    ├── raw/quintoandar/
+    ├── processed/
+    └── curated/
 ```
 
-## Componentes principais
+## Componentes e bairros
 
-- `config.py`: configura URLs, bairros e paginação por plataforma.
+- `config.py`: configura URLs e bairros do Quinto Andar.
 - `collection_utils.py`: deduplica URLs e grava metadados das coletas.
-- `generate_zap_data.py`: coleta anúncios do Zap Imóveis. Sem `--bairro`, processa todos os bairros configurados; aceita `--paginas` para sobrescrever a configuração padrão.
-- `generate_quintoandar_data.py`: coleta sequencialmente todos os bairros definidos em `BairroInfo`.
-- `compare_daily_urls.py`: compara a coleta mais recente com as coletas dos sete dias anteriores e gera os anúncios ainda não vistos nesse período.
+- `generate_quintoandar_data.py`: coleta sequencialmente todos os bairros configurados.
+- `compare_daily_urls.py`: compara a coleta mais recente com as coletas disponíveis dos sete dias anteriores.
+- `curadoria_imoveis.py`: extrai dados dos anúncios novos, classifica-os com Gemini e envia os resultados ao Google Sheets e ao CSV local.
 
-## Bairros configurados
-
-Atualmente, os coletores e o comparador estão configurados para:
-
-- `vila_mariana`
-- `vila_saude`
-- `bosque_saude`
-
-As configurações de busca ficam em `src/config.py`. Ao adicionar ou remover bairros, altere somente esse arquivo.
+Os bairros configurados em `src/config.py` são `vila_mariana`, `vila_saude` e `bosque_saude`.
 
 ## Requisitos e instalação
 
@@ -71,51 +57,45 @@ python -m pip install -r requirements.txt
 
 No PowerShell do Windows, ative o ambiente com `.\.venv\Scripts\Activate.ps1`.
 
-## Execução
+## Configuração do Gemini e Google Sheets
 
-Execute os comandos a partir da raiz do repositório.
+Configure estes **secrets** no repositório GitHub:
 
-### Coletar dados do Zap Imóveis
+- `GEMINI_API_KEY`: chave de API para classificar os anúncios com Gemini.
+- `GOOGLE_SHEETS_SPREADSHEET_ID`: ID da planilha.
+- `GOOGLE_SHEETS_CREDENTIALS_JSON`: JSON da conta de serviço. Compartilhe a planilha com o e-mail dessa conta e conceda acesso de editor.
 
-```bash
-python src/generate_zap_data.py --bairro vila_mariana
-python src/generate_zap_data.py --bairro vila_mariana --paginas 2
-python src/generate_zap_data.py
-```
+Variáveis opcionais do repositório:
 
-### Coletar dados do Quinto Andar
+- `GEMINI_MODEL`: modelo Gemini; padrão `gemini-2.5-flash`.
+- `GOOGLE_SHEETS_WORKSHEET`: nome da aba; padrão `Curadoria Imóveis`. Se não existir, o script tenta criá-la.
+- `CURATORIA_MAX_URLS`: máximo de URLs selecionadas da fila por execução; padrão `25`.
+
+O workflow usa `permissions: contents: write` para persistir CSVs, URLs processadas e a fila pendente no repositório.
+
+## Execução manual
+
+Execute os comandos a partir da raiz do repositório:
 
 ```bash
 python src/generate_quintoandar_data.py
-```
-
-Esse comando processa todos os bairros de `BairroInfo` em sequência e cria um CSV para cada um.
-
-### Comparar dados entre dias
-
-```bash
 python src/compare_daily_urls.py
+python src/curadoria_imoveis.py
 ```
 
-### Executar a rotina diária no GitHub Actions
+Para executar a curadoria manualmente, configure antes as mesmas variáveis de ambiente e credenciais usadas pelo workflow. O coletor processa os bairros em sequência; o comparador só gera resultados quando há uma coleta atual e pelo menos uma coleta anterior disponível nos sete dias.
 
-O workflow `.github/workflows/daily-collection.yml` pode ser iniciado manualmente ou executado diariamente pelo agendamento configurado. Ele instala Python, Chrome e as dependências, executa os dois coletores, compara as coletas e commita os CSVs e metadados gerados no repositório.
+## Formato e observações dos dados
 
-Para permitir o commit automático, o workflow usa `permissions: contents: write`. O horário do `cron` é UTC.
-
-## Formato dos dados
-
-Os CSVs usam uma coluna `URL`. O coletor do Quinto Andar normaliza anúncios para URLs canônicas, preservando a categoria necessária para o acesso:
+Os CSVs usam uma coluna `URL`. O coletor normaliza anúncios para URLs canônicas, preservando a categoria necessária para o acesso:
 
 ```text
 https://www.quintoandar.com.br/imovel/893329128/
 https://www.quintoandar.com.br/classificado/129214854/
 ```
 
-## Observações
-
-- O comparador ignora bairros sem pelo menos duas datas disponíveis.
-- Os dados coletados podem conter anúncios fora do bairro nominal quando a plataforma amplia os resultados da busca.
+- Os dados coletados podem conter anúncios fora do bairro nominal quando os resultados do Quinto Andar incluem imóveis de áreas próximas.
 - As páginas podem mudar de estrutura ou bloquear automações.
 - Cada coleta também gera um arquivo `.metadata.json` com plataforma, bairro, URL de busca, quantidade de URLs, início, fim e duração.
-- Dentro de cada plataforma, um anúncio encontrado em mais de um bairro é salvo somente no primeiro bairro da ordem configurada para a execução do dia.
+- Um anúncio encontrado em mais de um bairro é salvo somente no primeiro bairro da ordem configurada para a execução do dia.
+- A classificação depende do conteúdo acessível na página do anúncio e da disponibilidade das APIs Gemini e Google Sheets.
